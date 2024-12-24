@@ -35,18 +35,6 @@ A modern, feature-rich task management application built with vanilla JavaScript
 - **Animation**: Smooth CSS transitions and animations
 - **Excel Export**: Professional report generation with ExcelJS
 
-## 🚀 Getting Started
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/Task-Manager.git
-```
-
-2. Open `index.html` in your browser or use a local server:
-```bash
-npx serve
-```
-
 ## 🎨 Features Showcase
 
 ### Task Management

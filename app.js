@@ -297,133 +297,121 @@ document.addEventListener('DOMContentLoaded', () => {
             request.onerror = () => reject(request.error);
         });
     }
+   
 
-    // Add download functionality
-    // Add jsPDF library
-    // <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+   
+    function rgbToHex(rgb) {
+        return rgb.replace(/[^\d,]/g, '').split(',')
+            .map(x => parseInt(x).toString(16).padStart(2, '0'))
+            .join('');
+    }
 
-    // Modify generateReport function
     async function generateReport() {
         const tasks = await loadTasksFromDb();
-        const wb = XLSX.utils.book_new();
         
-        // Define styles
-        const headerStyle = {
-            font: { bold: true, color: { rgb: "FFFFFF" } },
-            fill: { fgColor: { rgb: "4F46E5" } },
-            alignment: { horizontal: "center", vertical: "center" },
-            border: {
-                top: { style: "medium", color: { rgb: "000000" } },
-                bottom: { style: "medium", color: { rgb: "000000" } },
-                left: { style: "medium", color: { rgb: "000000" } },
-                right: { style: "medium", color: { rgb: "000000" } }
-            }
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        
+        // Group tasks by status
+        const taskGroups = {
+            'All Tasks': tasks,
+            'Pending': tasks.filter(t => t.status === 'Pending'),
+            'In Progress': tasks.filter(t => t.status === 'In Progress'),
+            'Completed': tasks.filter(t => t.status === 'Completed')
         };
 
-        const cellStyle = {
-            border: {
-                top: { style: "thin", color: { rgb: "000000" } },
-                bottom: { style: "thin", color: { rgb: "000000" } },
-                left: { style: "thin", color: { rgb: "000000" } },
-                right: { style: "thin", color: { rgb: "000000" } }
-            }
-        };
+        // Create worksheets for each group
+        for (const [groupName, groupTasks] of Object.entries(taskGroups)) {
+            if (groupTasks.length === 0) continue;
 
-        const statusStyles = {
-            'Pending': { fill: { fgColor: { rgb: "FEF3C7" } } },        // Light yellow
-            'In Progress': { fill: { fgColor: { rgb: "DBEAFE" } } },    // Light blue
-            'Completed': { fill: { fgColor: { rgb: "DCFCE7" } } }       // Light green
-        };
+            const worksheet = workbook.addWorksheet(groupName);
 
-        // Process tasks by status
-        const tasksByStatus = {
-            'All Tasks': [],
-            'Pending': [],
-            'In Progress': [],
-            'Completed': []
-        };
-
-        // Prepare data with styling
-        tasks.forEach(task => {
-            const taskData = [
-                task.taskText,
-                task.status,
-                task.notes || '',
-                task.subtasks.length.toString(),
-                task.isChecked ? '✓' : ''
+            // Add headers
+            worksheet.columns = [
+                { header: 'Task', width: 45 },
+                { header: 'Status', width: 15 },
+                { header: 'Notes', width: 40 },
+                { header: 'Subtasks', width: 12 },
+                { header: 'Done', width: 8 }
             ];
 
-            tasksByStatus['All Tasks'].push(taskData);
-            tasksByStatus[task.status].push(taskData);
+            // Style headers
+            worksheet.getRow(1).eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: '4F46E5' }
+                };
+                cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            });
 
-            // Add subtasks with indentation
-            if (task.subtasks.length > 0) {
+            // Add data
+            groupTasks.forEach((task, index) => {
+                const row = worksheet.addRow([
+                    task.taskText,
+                    task.status,
+                    task.notes || '',
+                    task.subtasks.length,
+                    task.isChecked ? '✓' : ''
+                ]);
+
+                // Style status cell
+                const statusCell = row.getCell(2);
+                const statusColors = {
+                    'Pending': { bg: 'FEF3C7', font: '92400E' },
+                    'In Progress': { bg: 'DBEAFE', font: '1E40AF' },
+                    'Completed': { bg: 'DCFCE7', font: '166534' }
+                };
+                if (statusColors[task.status]) {
+                    statusCell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: statusColors[task.status].bg }
+                    };
+                    statusCell.font = { color: { argb: statusColors[task.status].font } };
+                }
+
+                // Add subtasks
                 task.subtasks.forEach(subtask => {
-                    const subtaskData = [
-                        `    • ${subtask.text}`,
+                    const subtaskRow = worksheet.addRow([
+                        `  • ${subtask.text}`,
                         subtask.completed ? 'Completed' : 'Pending',
                         subtask.notes || '',
                         '',
                         subtask.completed ? '✓' : ''
-                    ];
-                    tasksByStatus['All Tasks'].push(subtaskData);
-                    tasksByStatus[task.status].push(subtaskData);
-                });
-            }
-        });
+                    ]);
 
-        // Create worksheets
-        Object.entries(tasksByStatus).forEach(([status, data]) => {
-            if (data.length > 0) {
-                const headers = ['Task', 'Status', 'Notes', 'Subtasks', 'Done'];
-                const ws_data = [headers, ...data];
-                const ws = XLSX.utils.aoa_to_sheet(ws_data);
-
-                // Set column widths
-                ws['!cols'] = [
-                    { wch: 45 }, // Task
-                    { wch: 15 }, // Status
-                    { wch: 40 }, // Notes
-                    { wch: 12 }, // Subtasks
-                    { wch: 8 }   // Done
-                ];
-
-                // Apply styles to all cells
-                const range = XLSX.utils.decode_range(ws['!ref']);
-                for (let R = range.s.r; R <= range.e.r; ++R) {
-                    for (let C = range.s.c; C <= range.e.c; ++C) {
-                        const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
-                        const cell = ws[cell_address];
-                        if (!cell) continue;
-
-                        // Apply header styles to first row
-                        if (R === 0) {
-                            cell.s = headerStyle;
-                        } else {
-                            // Apply base cell style
-                            cell.s = { ...cellStyle };
-                            
-                            // Apply status-based colors to status column
-                            if (C === 1 && statusStyles[cell.v]) {
-                                cell.s.fill = statusStyles[cell.v].fill;
-                            }
-                            
-                            // Center-align the 'Subtasks' and 'Done' columns
-                            if (C >= 3) {
-                                cell.s.alignment = { horizontal: "center" };
-                            }
-                        }
+                    // Style subtask status
+                    const subtaskStatusCell = subtaskRow.getCell(2);
+                    const status = subtask.completed ? 'Completed' : 'Pending';
+                    if (statusColors[status]) {
+                        subtaskStatusCell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: statusColors[status].bg }
+                        };
+                        subtaskStatusCell.font = { color: { argb: statusColors[status].font } };
                     }
-                }
+                });
+            });
 
-                // Add the worksheet to workbook
-                XLSX.utils.book_append_sheet(wb, ws, status);
-            }
-        });
+            // Add autofilter
+            worksheet.autoFilter = 'A1:E1';
+        }
 
-        // Save with current date in filename
+        // Save workbook
         const date = new Date().toISOString().split('T')[0];
-        XLSX.writeFile(wb, `TaskManager_Report_${date}.xlsx`);
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create download link and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `TaskManager_Report_${date}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
     }
 
     // Update event listeners

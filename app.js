@@ -299,106 +299,131 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Add download functionality
+    // Add jsPDF library
+    // <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+    // Modify generateReport function
     async function generateReport() {
         const tasks = await loadTasksFromDb();
+        const wb = XLSX.utils.book_new();
         
-        // Generate interactive HTML report
-        const reportHtml = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Task Report</title>
-                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-                <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-                <script>
-                    function toggleSubtasks(id) {
-                        document.getElementById('subtasks-' + id).classList.toggle('hidden');
-                    }
-                    function toggleNotes(id) {
-                        document.getElementById('notes-' + id).classList.toggle('hidden');
-                    }
-                    function filterTasks(status) {
-                        document.querySelectorAll('.task-item').forEach(task => {
-                            if (status === 'all' || task.dataset.status === status) {
-                                task.style.display = '';
-                            } else {
-                                task.style.display = 'none';
-                            }
-                        });
-                        document.querySelectorAll('.filter-btn').forEach(btn => {
-                            btn.classList.toggle('bg-blue-500', btn.dataset.filter === status);
-                            btn.classList.toggle('text-white', btn.dataset.filter === status);
-                        });
-                    }
-                </script>
-            </head>
-            <body class="bg-gray-50 p-8">
-                <div class="max-w-5xl mx-auto">
-                    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
-                        <h1 class="text-2xl font-bold mb-4">Task Report</h1>
-                        <div class="flex gap-2 mb-6">
-                            <button onclick="filterTasks('all')" data-filter="all" class="filter-btn bg-blue-500 text-white px-4 py-2 rounded">
-                                All Tasks
-                            </button>
-                            <button onclick="filterTasks('Pending')" data-filter="Pending" class="filter-btn bg-gray-200 px-4 py-2 rounded">
-                                Pending
-                            </button>
-                            <button onclick="filterTasks('In Progress')" data-filter="In Progress" class="filter-btn bg-gray-200 px-4 py-2 rounded">
-                                In Progress
-                            </button>
-                            <button onclick="filterTasks('Completed')" data-filter="Completed" class="filter-btn bg-gray-200 px-4 py-2 rounded">
-                                Completed
-                            </button>
-                        </div>
-                        <div class="space-y-4">
-                            ${tasks.sort((a, b) => (a.order || 0) - (b.order || 0)).map((task, index) => `
-                                <div class="task-item bg-gray-50 rounded-lg p-4" data-status="${task.status}">
-                                    <div class="flex items-center gap-4">
-                                        <input type="checkbox" ${task.isChecked ? 'checked' : ''} class="w-5 h-5">
-                                        <span class="text-lg ${task.isChecked ? 'line-through text-gray-400' : ''}">${task.taskText}</span>
-                                        <span class="ml-auto px-3 py-1 rounded-full text-sm ${
-                                            task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-yellow-100 text-yellow-800'
-                                        }">${task.status}</span>
-                                    </div>
-                                    ${task.notes ? `
-                                        <button onclick="toggleNotes(${index})" class="text-sm text-blue-500 mt-2">Toggle Notes</button>
-                                        <div id="notes-${index}" class="hidden mt-2 p-3 bg-white rounded">${task.notes}</div>
-                                    ` : ''}
-                                    ${task.subtasks.length ? `
-                                        <button onclick="toggleSubtasks(${index})" class="text-sm text-blue-500 mt-2">Toggle Subtasks</button>
-                                        <div id="subtasks-${index}" class="hidden mt-2 ml-8 space-y-2">
-                                            ${task.subtasks.sort((a, b) => (a.order || 0) - (b.order || 0)).map(subtask => `
-                                                <div class="flex items-center gap-2">
-                                                    <input type="checkbox" ${subtask.completed ? 'checked' : ''} class="w-4 h-4">
-                                                    <span class="${subtask.completed ? 'line-through text-gray-400' : ''}">${subtask.text}</span>
-                                                </div>
-                                                ${subtask.notes ? `<div class="ml-6 mt-1 text-sm text-gray-600">${subtask.notes}</div>` : ''}
-                                            `).join('')}
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
+        // Define styles
+        const headerStyle = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "4F46E5" } },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: {
+                top: { style: "medium", color: { rgb: "000000" } },
+                bottom: { style: "medium", color: { rgb: "000000" } },
+                left: { style: "medium", color: { rgb: "000000" } },
+                right: { style: "medium", color: { rgb: "000000" } }
+            }
+        };
 
-        // Create and trigger download
-        const blob = new Blob([reportHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", url);
-        downloadAnchorNode.setAttribute("download", "task_report.html");
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-        URL.revokeObjectURL(url);
+        const cellStyle = {
+            border: {
+                top: { style: "thin", color: { rgb: "000000" } },
+                bottom: { style: "thin", color: { rgb: "000000" } },
+                left: { style: "thin", color: { rgb: "000000" } },
+                right: { style: "thin", color: { rgb: "000000" } }
+            }
+        };
+
+        const statusStyles = {
+            'Pending': { fill: { fgColor: { rgb: "FEF3C7" } } },        // Light yellow
+            'In Progress': { fill: { fgColor: { rgb: "DBEAFE" } } },    // Light blue
+            'Completed': { fill: { fgColor: { rgb: "DCFCE7" } } }       // Light green
+        };
+
+        // Process tasks by status
+        const tasksByStatus = {
+            'All Tasks': [],
+            'Pending': [],
+            'In Progress': [],
+            'Completed': []
+        };
+
+        // Prepare data with styling
+        tasks.forEach(task => {
+            const taskData = [
+                task.taskText,
+                task.status,
+                task.notes || '',
+                task.subtasks.length.toString(),
+                task.isChecked ? '✓' : ''
+            ];
+
+            tasksByStatus['All Tasks'].push(taskData);
+            tasksByStatus[task.status].push(taskData);
+
+            // Add subtasks with indentation
+            if (task.subtasks.length > 0) {
+                task.subtasks.forEach(subtask => {
+                    const subtaskData = [
+                        `    • ${subtask.text}`,
+                        subtask.completed ? 'Completed' : 'Pending',
+                        subtask.notes || '',
+                        '',
+                        subtask.completed ? '✓' : ''
+                    ];
+                    tasksByStatus['All Tasks'].push(subtaskData);
+                    tasksByStatus[task.status].push(subtaskData);
+                });
+            }
+        });
+
+        // Create worksheets
+        Object.entries(tasksByStatus).forEach(([status, data]) => {
+            if (data.length > 0) {
+                const headers = ['Task', 'Status', 'Notes', 'Subtasks', 'Done'];
+                const ws_data = [headers, ...data];
+                const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+                // Set column widths
+                ws['!cols'] = [
+                    { wch: 45 }, // Task
+                    { wch: 15 }, // Status
+                    { wch: 40 }, // Notes
+                    { wch: 12 }, // Subtasks
+                    { wch: 8 }   // Done
+                ];
+
+                // Apply styles to all cells
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
+                        const cell = ws[cell_address];
+                        if (!cell) continue;
+
+                        // Apply header styles to first row
+                        if (R === 0) {
+                            cell.s = headerStyle;
+                        } else {
+                            // Apply base cell style
+                            cell.s = { ...cellStyle };
+                            
+                            // Apply status-based colors to status column
+                            if (C === 1 && statusStyles[cell.v]) {
+                                cell.s.fill = statusStyles[cell.v].fill;
+                            }
+                            
+                            // Center-align the 'Subtasks' and 'Done' columns
+                            if (C >= 3) {
+                                cell.s.alignment = { horizontal: "center" };
+                            }
+                        }
+                    }
+                }
+
+                // Add the worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, status);
+            }
+        });
+
+        // Save with current date in filename
+        const date = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(wb, `TaskManager_Report_${date}.xlsx`);
     }
 
     // Update event listeners

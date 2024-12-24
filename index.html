@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+  
+    <style>
+        .task-enter {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .task-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 0.3s ease-out;
+        }
+        .loading-spinner {
+            display: none;
+            animation: spin 1s linear infinite;
+        }
+        .loading .loading-spinner {
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .task-drag {
+            cursor: move;
+            opacity: 0.5;
+        }
+        .overview-count {
+            @apply bg-gray-100 rounded-full px-3 py-1 text-sm;
+        }
+        .filter-active {
+            @apply bg-blue-50 text-blue-600;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100">
+    <div class="min-h-screen">
+        <!-- Sidebar -->
+        <div class="fixed w-64 h-full bg-white shadow-lg p-4 bg-opacity-90 backdrop-blur-sm">
+            <h1 class="text-2xl font-bold mb-8 text-gray-800 flex items-center gap-2">
+                <i class="fas fa-check-circle text-blue-500"></i>
+                Task Manager
+            </h1>
+
+            <!-- Task Overview -->
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h2 class="text-lg font-semibold mb-4">Overview</h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span>Total Tasks</span>
+                        <span id="total-count" class="overview-count">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Pending</span>
+                        <span id="pending-count" class="overview-count text-yellow-600">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>In Progress</span>
+                        <span id="progress-count" class="overview-count text-blue-600">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Completed</span>
+                        <span id="completed-count" class="overview-count text-green-600">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold mb-4">Filters</h2>
+                <div class="space-y-2">
+                    <button data-filter="all" class="filter-btn filter-active w-full text-left p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        <i class="fas fa-tasks mr-2"></i>All Tasks
+                    </button>
+                    <button data-filter="Pending" class="filter-btn w-full text-left p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        <i class="far fa-circle mr-2"></i>Pending
+                    </button>
+                    <button data-filter="In Progress" class="filter-btn w-full text-left p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        <i class="fas fa-clock mr-2"></i>In Progress
+                    </button>
+                    <button data-filter="Completed" class="filter-btn w-full text-left p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        <i class="fas fa-check-circle mr-2"></i>Completed
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="ml-64 p-8">
+            <!-- Add Task Section -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6 transform transition-all duration-300 hover:shadow-md">
+                <div class="flex items-center gap-4">
+                    <input id="new-task" type="text" 
+                        class="flex-1 p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200" 
+                        placeholder="What needs to be done?">
+                    <select id="task-status" 
+                        class="p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200">
+                        <option value="Pending">⭕ Pending</option>
+                        <option value="In Progress">⏳ In Progress</option>
+                        <option value="Completed">✅ Completed</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-4 mt-4">
+                    <button id="add-task" 
+                        class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors flex-1 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2">
+                        <i class="fas fa-plus"></i>
+                        <span>Add Task</span>
+                        <i class="fas fa-spinner loading-spinner"></i>
+                    </button>
+                    <button id="save-tasks" 
+                        class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex-1 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2">
+                        <i class="fas fa-download"></i>
+                        <span>Download Report</span>
+                        <i class="fas fa-spinner loading-spinner"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Task List -->
+            <div id="task-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Tasks will be added here -->
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

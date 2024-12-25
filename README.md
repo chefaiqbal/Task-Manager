@@ -2,6 +2,8 @@
 
 A modern, feature-rich task management application built with vanilla JavaScript and TailwindCSS.
 
+![GitHub all releases](https://img.shields.io/github/downloads/chefaiqbal/Task-Manager/total?style=for-the-badge&logo=github&color=blue&label=Downloads)
+
 ## ✨ Features
 
 - 🎯 Create, edit, and delete tasks

@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addTaskButton = document.getElementById('add-task');
     const taskList = document.getElementById('task-list');
     const saveTasksButton = document.getElementById('save-tasks');
+    const exportJsonButton = document.getElementById('export-json');
+    const importJsonButton = document.getElementById('import-json');
     let db;
 
     // Base function definitions first
@@ -632,5 +634,51 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error generating report:', error);
         }
+    });
+
+    // Function to export tasks as JSON
+    async function exportTasksAsJson() {
+        const tasks = await loadTasksFromDb();
+        const json = JSON.stringify(tasks, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'tasks.json';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Function to import tasks from JSON
+    async function importTasksFromJson(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const tasks = JSON.parse(e.target.result);
+                const transaction = db.transaction(['tasks'], 'readwrite');
+                const store = transaction.objectStore('tasks');
+                store.clear();
+                tasks.forEach(task => store.add(task));
+                transaction.oncomplete = () => loadTasks();
+                transaction.onerror = () => console.error('Error importing tasks:', transaction.error);
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // Event listeners for JSON export and import
+    exportJsonButton.addEventListener('click', exportTasksAsJson);
+    importJsonButton.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json';
+        input.addEventListener('change', importTasksFromJson);
+        input.click();
     });
 });
